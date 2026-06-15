@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interview Scorecard Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --navy: #0f2744;
+    --navy-mid: #1a3a5c;
+    --blue: #2563eb;
+    --blue-light: #dbeafe;
+    --teal: #0d9488;
+    --teal-light: #ccfbf1;
+    --amber: #d97706;
+    --amber-light: #fef3c7;
+    --coral: #dc2626;
+    --coral-light: #fee2e2;
+    --purple: #7c3aed;
+    --purple-light: #ede9fe;
+    --gray-50: #f8fafc;
+    --gray-100: #f1f5f9;
+    --gray-200: #e2e8f0;
+    --gray-400: #94a3b8;
+    --gray-600: #475569;
+    --gray-800: #1e293b;
+    --white: #ffffff;
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+    --radius: 10px;
+    --radius-lg: 16px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--gray-50);
+    color: var(--gray-800);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--navy);
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .logo-mark {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: var(--blue);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; color: white; letter-spacing: -1px;
+  }
+  .header h1 { font-size: 15px; font-weight: 600; color: white; letter-spacing: -0.2px; }
+  .header p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px;
+    font-weight: 500; cursor: pointer; border: none; transition: all 0.15s;
+    font-family: var(--font);
+  }
+  .btn-primary { background: var(--blue); color: white; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-ghost { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.15); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.18); }
+  .btn-sm { padding: 6px 10px; font-size: 12px; }
+  .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+  /* ── UPLOAD ZONE ── */
+  #uploadZone {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: calc(100vh - 64px);
+    padding: 2rem;
+  }
+  .upload-card {
+    background: white; border-radius: var(--radius-lg);
+    border: 2px dashed var(--gray-200);
+    padding: 3rem 2.5rem; max-width: 520px; width: 100%;
+    text-align: center; transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+  }
+  .upload-card.drag-over {
+    border-color: var(--blue); background: var(--blue-light);
+  }
+  .upload-icon {
+    width: 56px; height: 56px; border-radius: 14px;
+    background: var(--blue-light); display: flex; align-items: center;
+    justify-content: center; margin: 0 auto 1.25rem;
+  }
+  .upload-icon svg { width: 26px; height: 26px; color: var(--blue); }
+  .upload-card h2 { font-size: 18px; font-weight: 600; color: var(--gray-800); margin-bottom: 8px; }
+  .upload-card p { font-size: 14px; color: var(--gray-600); line-height: 1.6; }
+  .upload-card .hint { font-size: 12px; color: var(--gray-400); margin-top: 1rem; }
+  .upload-card .supported {
+    display: flex; gap: 8px; justify-content: center; margin-top: 1.25rem; flex-wrap: wrap;
+  }
+  .tag {
+    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500;
+    background: var(--gray-100); color: var(--gray-600); border: 1px solid var(--gray-200);
+  }
+  #fileInput { display: none; }
+  .upload-btn-wrap { margin-top: 1.5rem; }
+
+  .mapping-info {
+    max-width: 520px; width: 100%; margin-top: 1.5rem;
+    background: white; border-radius: var(--radius); border: 1px solid var(--gray-200);
+    padding: 1rem 1.25rem;
+  }
+  .mapping-info h3 { font-size: 12px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .mapping-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+  .mapping-row:not(:last-child) { border-bottom: 1px solid var(--gray-100); }
+  .mapping-kw { font-family: monospace; font-size: 11px; background: var(--gray-100); padding: 2px 6px; border-radius: 4px; color: var(--gray-600); }
+  .arrow { color: var(--gray-400); font-size: 10px; }
+  .type-badge {
+    padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+
+  /* ── DASHBOARD ── */
+  #dashboard { display: none; padding: 1.5rem 2rem 2rem; max-width: 1400px; margin: 0 auto; }
+
+  .dash-header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 1.5rem;
+  }
+  .dash-title { font-size: 20px; font-weight: 700; color: var(--gray-800); }
+  .dash-sub { font-size: 13px; color: var(--gray-600); margin-top: 2px; }
+  .dash-actions { display: flex; gap: 8px; align-items: center; }
+
+  /* filters */
+  .filters {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1.5rem;
+    background: white; border: 1px solid var(--gray-200);
+    border-radius: var(--radius); padding: 10px 14px; align-items: center;
+  }
+  .filters label { font-size: 12px; font-weight: 500; color: var(--gray-600); }
+  .filters select {
+    font-size: 13px; padding: 6px 10px; border-radius: 7px;
+    border: 1px solid var(--gray-200); background: var(--gray-50);
+    color: var(--gray-800); font-family: var(--font); cursor: pointer;
+  }
+  .filters select:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .filter-sep { width: 1px; height: 20px; background: var(--gray-200); }
+
+  /* metrics */
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+  .metric-card {
+    background: white; border-radius: var(--radius); border: 1px solid var(--gray-200);
+    padding: 1rem 1.25rem; box-shadow: var(--shadow);
+  }
+  .metric-card .m-label { font-size: 11px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .metric-card .m-val { font-size: 28px; font-weight: 700; color: var(--gray-800); letter-spacing: -1px; line-height: 1; }
+  .metric-card .m-sub { font-size: 12px; color: var(--gray-400); margin-top: 4px; }
+  .metric-card.accent-blue { border-top: 3px solid var(--blue); }
+  .metric-card.accent-teal { border-top: 3px solid var(--teal); }
+  .metric-card.accent-amber { border-top: 3px solid var(--amber); }
+  .metric-card.accent-purple { border-top: 3px solid var(--purple); }
+  .metric-card.accent-coral { border-top: 3px solid var(--coral); }
+
+  /* grid layouts */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .grid-3-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+
+  @media (max-width: 900px) {
+    .grid-2, .grid-3, .grid-3-1 { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: white; border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200); padding: 1.25rem;
+    box-shadow: var(--shadow);
+  }
+  .card-title {
+    font-size: 13px; font-weight: 600; color: var(--gray-800);
+    margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;
+  }
+  .card-title svg { width: 15px; height: 15px; color: var(--gray-400); flex-shrink: 0; }
+
+  /* champion */
+  .champion-wrap {
+    display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap;
+  }
+  .champion-avatar {
+    width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
+    background: var(--navy); display: flex; align-items: center;
+    justify-content: center; font-size: 18px; font-weight: 700;
+    color: white; letter-spacing: -1px;
+  }
+  .champion-info { flex: 1; min-width: 0; }
+  .champion-name { font-size: 20px; font-weight: 700; color: var(--gray-800); letter-spacing: -0.5px; }
+  .champion-role { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
+  .champion-stats { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .cstat {
+    background: var(--gray-50); border: 1px solid var(--gray-200);
+    border-radius: 8px; padding: 8px 14px; text-align: center; min-width: 72px;
+  }
+  .cstat .cv { font-size: 20px; font-weight: 700; color: var(--gray-800); }
+  .cstat .cl { font-size: 10px; font-weight: 500; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+  .gold-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--amber-light); color: #92400e;
+    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    margin-left: 8px;
+  }
+
+  /* leaderboard */
+  .leaderboard { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .leaderboard th {
+    font-size: 11px; font-weight: 600; color: var(--gray-400);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    padding: 6px 10px; text-align: left;
+    border-bottom: 1px solid var(--gray-200); white-space: nowrap;
+  }
+  .leaderboard td {
+    padding: 9px 10px; border-bottom: 1px solid var(--gray-100);
+    color: var(--gray-800); vertical-align: middle;
+  }
+  .leaderboard tr:last-child td { border-bottom: none; }
+  .leaderboard tr:hover td { background: var(--gray-50); }
+  .rank-num { font-weight: 700; font-size: 13px; color: var(--gray-400); width: 30px; }
+  .iv-name { font-weight: 600; color: var(--gray-800); }
+  .bar-wrap { background: var(--gray-100); border-radius: 4px; height: 6px; min-width: 80px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; background: var(--blue); transition: width 0.5s ease; }
+  .total-num { font-weight: 700; font-size: 15px; color: var(--gray-800); }
+  .hours-num { color: var(--gray-400); font-size: 12px; }
+
+  /* type badges */
+  .tb { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; display: inline-block; }
+  .tb-ts { background: var(--blue-light); color: #1e40af; }
+  .tb-cr { background: var(--teal-light); color: #0f766e; }
+  .tb-tp { background: var(--amber-light); color: #92400e; }
+  .tb-ci { background: var(--purple-light); color: #5b21b6; }
+  .tb-na { background: var(--gray-100); color: var(--gray-600); }
+
+  /* chart container */
+  .chart-wrap { position: relative; }
+
+  /* type breakdown cards */
+  .type-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .type-card {
+    border-radius: 8px; padding: 12px 14px;
+    border: 1px solid var(--gray-200);
+  }
+  .type-card .tc-label { font-size: 11px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.4px; }
+  .type-card .tc-val { font-size: 24px; font-weight: 700; margin-top: 2px; letter-spacing: -1px; }
+  .type-card .tc-hrs { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+  .type-card.ts { border-left: 3px solid var(--blue); }
+  .type-card.cr { border-left: 3px solid var(--teal); }
+  .type-card.tp { border-left: 3px solid var(--amber); }
+  .type-card.ci { border-left: 3px solid var(--purple); }
+  .type-card.ts .tc-val { color: var(--blue); }
+  .type-card.cr .tc-val { color: var(--teal); }
+  .type-card.tp .tc-val { color: var(--amber); }
+  .type-card.ci .tc-val { color: var(--purple); }
+
+  /* empty state */
+  .empty { text-align: center; padding: 2rem; color: var(--gray-400); font-size: 13px; }
+
+  /* toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--gray-800); color: white; padding: 10px 18px;
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* scrollable table container */
+  .table-scroll { overflow-x: auto; }
+
+  .footer {
+    text-align: center; padding: 1.5rem;
+    font-size: 12px; color: var(--gray-400);
+    border-top: 1px solid var(--gray-200); margin-top: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo-mark">IV</div>
+    <div>
+      <h1>Interview Dashboard</h1>
+      <p id="headerSub">Upload a Greenhouse scorecard export to begin</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-ghost btn-sm" id="resetBtn" style="display:none" onclick="resetDashboard()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Upload new file
+    </button>
+    <button class="btn btn-primary btn-sm" id="uploadNewBtn" onclick="document.getElementById('fileInput').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Upload Excel
+    </button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFile(this.files[0])">
+  </div>
+</header>
+
+<!-- UPLOAD ZONE -->
+<div id="uploadZone">
+  <div class="upload-card" id="dropZone"
+    onclick="document.getElementById('fileInput').click()"
+    ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFile(event)">
+    <div class="upload-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="12" y1="18" x2="12" y2="12"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <h2>Drop your Greenhouse export here</h2>
+    <p>Upload the XLS / XLSX scorecard file exported from Greenhouse Reports. The dashboard will automatically parse interviewers, interview types, and candidate data.</p>
+    <div class="supported">
+      <span class="tag">.xlsx</span>
+      <span class="tag">.xls</span>
+      <span class="tag">.csv</span>
+    </div>
+    <div class="upload-btn-wrap">
+      <button class="btn btn-primary" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Choose file
+      </button>
+    </div>
+    <p class="hint">Your data never leaves your browser — everything is processed locally.</p>
+  </div>
+
+  <div class="mapping-info">
+    <h3>How interview types are detected</h3>
+    <div class="mapping-row">
+      <span class="mapping-kw">Technical Screening</span>
+      <span class="arrow">→</span>
+      <span class="type-badge tb tb-ts">Tech Screening</span>
+      <span style="font-size:12px;color:var(--gray-400);margin-left:auto">30 min</span>
+    </div>
+    <div class="mapping-row">
+      <span class="mapping-kw">Snapcode Review / Code Review</span>
+      <span class="arrow">→</span>
+      <span class="type-badge tb tb-cr">Code Review</span>
+      <span style="font-size:12px;color:var(--gray-400);margin-left:auto">30 min</span>
+    </div>
+    <div class="mapping-row">
+      <span class="mapping-kw">Technical Skills Interview</span>
+      <span class="arrow">→</span>
+      <span class="type-badge tb tb-tp">Technical Pairing</span>
+      <span style="font-size:12px;color:var(--gray-400);margin-left:auto">90 min</span>
+    </div>
+    <div class="mapping-row">
+      <span class="mapping-kw">Consulting Skills Interview</span>
+      <span class="arrow">→</span>
+      <span class="type-badge tb tb-ci">Consulting</span>
+      <span style="font-size:12px;color:var(--gray-400);margin-left:auto">60 min</span>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="dash-header">
+    <div>
+      <div class="dash-title">Scorecard Dashboard</div>
+      <div class="dash-sub" id="dashSub">—</div>
+    </div>
+    <div class="dash-actions">
+      <select id="filterType" onchange="renderDashboard()" style="font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--gray-200);background:white;font-family:var(--font);cursor:pointer">
+        <option value="all">All interview types</option>
+        <option value="Tech Screening">Tech Screening</option>
+        <option value="Code Review">Code Review</option>
+        <option value="Technical Pairing">Technical Pairing</option>
+        <option value="Consulting">Consulting</option>
+      </select>
+      <select id="filterRole" onchange="renderDashboard()" style="font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--gray-200);background:white;font-family:var(--font);cursor:pointer">
+        <option value="all">All roles</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- METRICS -->
+  <div class="metrics" id="metricsRow"></div>
+
+  <!-- ROW 1 -->
+  <div class="grid-3-1">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Top 10 interviewers — by scorecard volume
+      </div>
+      <div class="table-scroll">
+        <table class="leaderboard" id="leaderTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Interviewer</th>
+              <th>Tech Screen</th>
+              <th>Code Review</th>
+              <th>Tech Pairing</th>
+              <th>Consulting</th>
+              <th>Total</th>
+              <th>Hours</th>
+              <th>Volume</th>
+            </tr>
+          </thead>
+          <tbody id="leaderBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+        Champion
+        <span class="gold-badge">⭐ Most interviews</span>
+      </div>
+      <div id="champCard"><div class="empty">No data</div></div>
+    </div>
+  </div>
+
+  <!-- ROW 2 -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        Scorecards by interview type
+      </div>
+      <div class="type-cards" id="typeCards"></div>
+      <div class="chart-wrap" style="margin-top:1rem;height:200px">
+        <canvas id="typeChart" role="img" aria-label="Scorecards by interview type"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        Scorecards by role / job
+      </div>
+      <div class="chart-wrap" style="height:260px">
+        <canvas id="roleChart" role="img" aria-label="Scorecards by role"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3 -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Submission trend over time
+      </div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="trendChart" role="img" aria-label="Scorecard submissions over time"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        Hours invested by type
+      </div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="hoursChart" role="img" aria-label="Hours by interview type"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Data processed entirely in your browser · No server · No storage · Refresh page to clear
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const TYPE_MAP = [
+  // Tech Screening — 30 min
+  { keywords: ['technical screening', 'tech screening', 'technical screen'], type: 'Tech Screening', mins: 30 },
+  // Code Review — 30 min
+  { keywords: ['snapcode review', 'snap code review', 'code review'], type: 'Code Review', mins: 30 },
+  // Technical Pairing — 90 min (exact Greenhouse name: "Technical Skills Interview")
+  { keywords: ['technical skills interview', 'technical skills', 'technical interview', 'tech pairing', 'technical pairing'], type: 'Technical Pairing', mins: 90 },
+  // Consulting — 60 min (exact Greenhouse names: "Consulting Skills Interview 2026", "Consulting Skills Interview (Pilot)")
+  { keywords: ['consulting skills interview', 'consulting skills', 'consulting interview', 'consulting'], type: 'Consulting', mins: 60 },
+];
+
+const TYPE_COLORS = {
+  'Tech Screening':   '#2563eb',
+  'Code Review':      '#0d9488',
+  'Technical Pairing':'#d97706',
+  'Consulting':       '#7c3aed',
+};
+
+const BADGE_CLASS = {
+  'Tech Screening':    'tb-ts',
+  'Code Review':       'tb-cr',
+  'Technical Pairing': 'tb-tp',
+  'Consulting':        'tb-ci',
+};
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let allRows = [];
+let charts = {};
+
+// ── UPLOAD HANDLERS ────────────────────────────────────────────────────────
+function dragOver(e) { e.preventDefault(); document.getElementById('dropZone').classList.add('drag-over'); }
+function dragLeave(e) { document.getElementById('dropZone').classList.remove('drag-over'); }
+function dropFile(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const reader = new FileReader();
+
+  reader.onload = function(e) {
+    try {
+      let data;
+      if (ext === 'csv') {
+        data = parseGreenhouseCSV(e.target.result);
+      } else {
+        data = parseGreenhouseXLS(new Uint8Array(e.target.result));
+      }
+      allRows = processRows(data);
+      if (allRows.length === 0) {
+        showToast('⚠️ No scorecard data found. Make sure this is a Greenhouse Scorecard Feedback Report.');
+        return;
+      }
+      populateRoleFilter();
+      showDashboard(file.name, allRows.length);
+      renderDashboard();
+    } catch (err) {
+      showToast('Error reading file: ' + err.message);
+    }
+  };
+
+  if (ext === 'csv') reader.readAsText(file);
+  else reader.readAsArrayBuffer(file);
+}
+
+// ── GREENHOUSE-SPECIFIC PARSERS ────────────────────────────────────────────
+// Greenhouse exports have 3 metadata rows before real headers:
+// Row 1: "Scorecard Feedback Report"
+// Row 2: "Report Filters: ..."
+// Row 3: blank
+// Row 4: actual column headers → Candidate Name, Job, Requisition ID,
+//         Department, Current Status, Stage, Interview, Scheduled,
+//         Submitted, Interviewer, Outcome
+
+function parseGreenhouseXLS(buffer) {
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: true, raw: false });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  // Convert to array-of-arrays so we can find the real header row
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  // Find the row index where "Candidate Name" appears (real header row)
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(raw.length, 10); i++) {
+    if (raw[i].some(cell => String(cell).trim() === 'Candidate Name')) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx === -1) {
+    // Fallback: treat first row as header
+    headerIdx = 0;
+  }
+
+  const headers = raw[headerIdx].map(h => String(h).trim());
+  const dataRows = raw.slice(headerIdx + 1);
+
+  return dataRows
+    .filter(row => row.some(cell => cell !== ''))
+    .map(row => {
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
+      return obj;
+    });
+}
+
+function parseGreenhouseCSV(text) {
+  const lines = text.trim().split('\n');
+  // Find header row containing "Candidate Name"
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    if (lines[i].includes('Candidate Name')) { headerIdx = i; break; }
+  }
+  const headers = lines[headerIdx].split(',').map(h => h.replace(/"/g,'').trim());
+  return lines.slice(headerIdx + 1)
+    .filter(l => l.trim())
+    .map(line => {
+      const vals = line.split(',').map(v => v.replace(/"/g,'').trim());
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = vals[i] || '');
+      return obj;
+    });
+}
+
+// ── DATA PROCESSING ────────────────────────────────────────────────────────
+function classifyType(str) {
+  const s = (str || '').toLowerCase().trim();
+  for (const m of TYPE_MAP) {
+    if (m.keywords.some(k => s.includes(k))) return { type: m.type, mins: m.mins };
+  }
+  return { type: 'Other', mins: 0 };
+}
+
+function formatDate(val) {
+  if (!val) return '';
+  if (val instanceof Date) return val.toISOString().slice(0, 7);
+  const s = String(val);
+  // MM/DD/YYYY
+  const m2 = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+  if (m2) return `${m2[3]}-${m2[1].padStart(2,'0')}`;
+  // YYYY-MM-DD
+  const m1 = s.match(/(\d{4})[\/\-](\d{2})/);
+  if (m1) return `${m1[1]}-${m1[2]}`;
+  return s.slice(0, 7);
+}
+
+function processRows(data) {
+  return data.map(row => {
+    // Use exact Greenhouse column names, with fallbacks
+    const interviewer = String(row['Interviewer'] || row['interviewer'] || '').trim();
+    const candidate   = String(row['Candidate Name'] || row['candidate'] || '').trim();
+    // Interview column holds the specific interview name (e.g. "Snapcode Review")
+    // Stage column holds the stage group (e.g. "Consulting Skills Interview")
+    const interviewRaw = String(row['Interview'] || row['interview'] || row['Stage'] || row['stage'] || '').trim();
+    const stageRaw     = String(row['Stage'] || row['stage'] || '').trim();
+    const role         = String(row['Job'] || row['job'] || row['Role'] || '').trim();
+    const dateRaw      = row['Submitted'] || row['submitted'] || row['Scheduled'] || row['scheduled'] || '';
+    const outcome      = String(row['Outcome'] || row['outcome'] || row['Overall'] || '').trim();
+    const department   = String(row['Department'] || row['department'] || '').trim();
+    const status       = String(row['Current Status'] || row['current status'] || '').trim();
+
+    if (!interviewer && !candidate) return null;
+
+    // Classify by Interview column first, then Stage as fallback
+    let classified = classifyType(interviewRaw);
+    if (classified.type === 'Other' && stageRaw) {
+      classified = classifyType(stageRaw);
+    }
+
+    // Clean job name: strip "IND - " prefix for display
+    const cleanRole = role.replace(/^IND\s*[-–]\s*/i, '').trim() || 'Unknown Role';
+
+    return {
+      interviewer: interviewer || 'Unknown',
+      candidate,
+      interviewRaw,
+      stageRaw,
+      type:    classified.type,
+      mins:    classified.mins,
+      role:    cleanRole,
+      rawRole: role,
+      date:    formatDate(dateRaw),
+      outcome,
+      department,
+      status,
+    };
+  }).filter(r => r && r.interviewer !== 'Unknown' || r && r.candidate);
+}
+
+// ── FILTERS ────────────────────────────────────────────────────────────────
+function getFiltered() {
+  const type = document.getElementById('filterType').value;
+  const role = document.getElementById('filterRole').value;
+  return allRows.filter(r =>
+    (type === 'all' || r.type === type) &&
+    (role === 'all' || r.role === role)
+  );
+}
+
+function populateRoleFilter() {
+  const roles = [...new Set(allRows.map(r => r.role))].sort();
+  const sel = document.getElementById('filterRole');
+  sel.innerHTML = '<option value="all">All roles</option>' +
+    roles.map(r => `<option value="${r}">${r}</option>`).join('');
+}
+
+// ── SHOW / HIDE ────────────────────────────────────────────────────────────
+function showDashboard(filename, count) {
+  document.getElementById('uploadZone').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('resetBtn').style.display = 'flex';
+  document.getElementById('uploadNewBtn').style.display = 'none';
+  document.getElementById('headerSub').textContent = filename + ' · ' + count + ' scorecards loaded';
+  document.getElementById('dashSub').textContent = count + ' scorecards from ' + filename;
+  showToast('✓ ' + count + ' scorecards loaded successfully');
+}
+
+function resetDashboard() {
+  allRows = [];
+  Object.values(charts).forEach(c => c && c.destroy());
+  charts = {};
+  document.getElementById('fileInput').value = '';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('uploadZone').style.display = 'flex';
+  document.getElementById('resetBtn').style.display = 'none';
+  document.getElementById('uploadNewBtn').style.display = 'flex';
+  document.getElementById('headerSub').textContent = 'Upload a Greenhouse scorecard export to begin';
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const rows = getFiltered();
+  renderMetrics(rows);
+  renderLeaderboard(rows);
+  renderChampion(rows);
+  renderTypeCards(rows);
+  renderTypeChart(rows);
+  renderRoleChart(rows);
+  renderTrendChart(rows);
+  renderHoursChart(rows);
+}
+
+function renderMetrics(rows) {
+  const total = rows.length;
+  const ivs = new Set(rows.map(r => r.interviewer)).size;
+  const roles = new Set(rows.map(r => r.role)).size;
+  const hrs = Math.round(rows.reduce((s, r) => s + r.mins, 0) / 60);
+  document.getElementById('metricsRow').innerHTML = `
+    <div class="metric-card accent-blue">
+      <div class="m-label">Total Scorecards</div>
+      <div class="m-val">${total.toLocaleString()}</div>
+      <div class="m-sub">submitted</div>
+    </div>
+    <div class="metric-card accent-teal">
+      <div class="m-label">Active Interviewers</div>
+      <div class="m-val">${ivs}</div>
+      <div class="m-sub">panelists</div>
+    </div>
+    <div class="metric-card accent-amber">
+      <div class="m-label">Roles Covered</div>
+      <div class="m-val">${roles}</div>
+      <div class="m-sub">job types</div>
+    </div>
+    <div class="metric-card accent-purple">
+      <div class="m-label">Interview Hours</div>
+      <div class="m-val">${hrs.toLocaleString()}</div>
+      <div class="m-sub">total invested</div>
+    </div>
+  `;
+}
+
+function aggIV(rows) {
+  const m = {};
+  rows.forEach(r => {
+    if (!m[r.interviewer]) m[r.interviewer] = { total: 0, hrs: 0, ts: 0, cr: 0, tp: 0, ci: 0, other: 0 };
+    const iv = m[r.interviewer];
+    iv.total++;
+    iv.hrs += r.mins / 60;
+    if (r.type === 'Tech Screening')    iv.ts++;
+    else if (r.type === 'Code Review')       iv.cr++;
+    else if (r.type === 'Technical Pairing') iv.tp++;
+    else if (r.type === 'Consulting')        iv.ci++;
+    else iv.other++;
+  });
+  return Object.entries(m).sort((a, b) => b[1].total - a[1].total);
+}
+
+function renderLeaderboard(rows) {
+  const sorted = aggIV(rows);
+  const max = sorted[0]?.[1].total || 1;
+  const body = document.getElementById('leaderBody');
+  if (!sorted.length) { body.innerHTML = `<tr><td colspan="9" class="empty">No data</td></tr>`; return; }
+
+  body.innerHTML = sorted.slice(0, 10).map(([name, s], i) => {
+    const pct = Math.round((s.total / max) * 100);
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+    return `<tr>
+      <td class="rank-num">${medal}</td>
+      <td class="iv-name">${name}</td>
+      <td>${s.ts || '–'}</td>
+      <td>${s.cr || '–'}</td>
+      <td>${s.tp || '–'}</td>
+      <td>${s.ci || '–'}</td>
+      <td class="total-num">${s.total}</td>
+      <td class="hours-num">${Math.round(s.hrs)}h</td>
+      <td style="min-width:100px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <span style="font-size:11px;color:var(--gray-400)">${pct}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderChampion(rows) {
+  const sorted = aggIV(rows);
+  const el = document.getElementById('champCard');
+  if (!sorted.length) { el.innerHTML = '<div class="empty">No data</div>'; return; }
+  const [name, s] = sorted[0];
+  const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  el.innerHTML = `
+    <div class="champion-wrap">
+      <div class="champion-avatar">${initials}</div>
+      <div class="champion-info">
+        <div class="champion-name">${name}</div>
+        <div class="champion-role">${s.total} total scorecards · ${Math.round(s.hrs)}h invested</div>
+        <div class="champion-stats">
+          <div class="cstat"><div class="cv" style="color:var(--blue)">${s.ts}</div><div class="cl">Tech Screen</div></div>
+          <div class="cstat"><div class="cv" style="color:var(--teal)">${s.cr}</div><div class="cl">Code Review</div></div>
+          <div class="cstat"><div class="cv" style="color:var(--amber)">${s.tp}</div><div class="cl">Tech Pairing</div></div>
+          <div class="cstat"><div class="cv" style="color:var(--purple)">${s.ci}</div><div class="cl">Consulting</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderTypeCards(rows) {
+  const counts = { 'Tech Screening': 0, 'Code Review': 0, 'Technical Pairing': 0, 'Consulting': 0 };
+  const hrs    = { 'Tech Screening': 0, 'Code Review': 0, 'Technical Pairing': 0, 'Consulting': 0 };
+  rows.forEach(r => { if (counts[r.type] !== undefined) { counts[r.type]++; hrs[r.type] += r.mins / 60; } });
+  document.getElementById('typeCards').innerHTML = `
+    <div class="type-card ts"><div class="tc-label">Tech Screening</div><div class="tc-val">${counts['Tech Screening']}</div><div class="tc-hrs">${Math.round(hrs['Tech Screening'])}h · 30 min each</div></div>
+    <div class="type-card cr"><div class="tc-label">Code Review</div><div class="tc-val">${counts['Code Review']}</div><div class="tc-hrs">${Math.round(hrs['Code Review'])}h · 30 min each</div></div>
+    <div class="type-card tp"><div class="tc-label">Technical Pairing</div><div class="tc-val">${counts['Technical Pairing']}</div><div class="tc-hrs">${Math.round(hrs['Technical Pairing'])}h · 90 min each</div></div>
+    <div class="type-card ci"><div class="tc-label">Consulting</div><div class="tc-val">${counts['Consulting']}</div><div class="tc-hrs">${Math.round(hrs['Consulting'])}h · 60 min each</div></div>
+  `;
+}
+
+function destroyChart(key) { if (charts[key]) { charts[key].destroy(); charts[key] = null; } }
+
+function renderTypeChart(rows) {
+  destroyChart('type');
+  const types = ['Tech Screening', 'Code Review', 'Technical Pairing', 'Consulting'];
+  const counts = types.map(t => rows.filter(r => r.type === t).length);
+  charts.type = new Chart(document.getElementById('typeChart'), {
+    type: 'bar',
+    data: {
+      labels: types,
+      datasets: [{ data: counts, backgroundColor: types.map(t => TYPE_COLORS[t]), borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 11 }, maxRotation: 15 }, grid: { display: false } },
+        y: { ticks: { font: { size: 11 }, stepSize: 1 }, grid: { color: 'rgba(0,0,0,0.05)' } }
+      }
+    }
+  });
+}
+
+function renderRoleChart(rows) {
+  destroyChart('role');
+  const roleCount = {};
+  rows.forEach(r => roleCount[r.role] = (roleCount[r.role] || 0) + 1);
+  const sorted = Object.entries(roleCount).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  const wrapH = Math.max(240, sorted.length * 32 + 60);
+  document.querySelector('#roleChart').parentElement.style.height = wrapH + 'px';
+  charts.role = new Chart(document.getElementById('roleChart'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(([r]) => r),
+      datasets: [{ data: sorted.map(([, c]) => c), backgroundColor: '#2563eb', borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.05)' } },
+        y: { ticks: { font: { size: 11 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderTrendChart(rows) {
+  destroyChart('trend');
+  const byMonth = {};
+  rows.forEach(r => { if (r.date) byMonth[r.date] = (byMonth[r.date] || 0) + 1; });
+  const months = Object.keys(byMonth).sort();
+  charts.trend = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [{
+        data: months.map(m => byMonth[m]),
+        borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.07)',
+        tension: 0.35, fill: true, pointRadius: 4, pointBackgroundColor: '#2563eb'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 11 }, maxRotation: 30 }, grid: { display: false } },
+        y: { ticks: { font: { size: 11 }, stepSize: 1 }, grid: { color: 'rgba(0,0,0,0.05)' } }
+      }
+    }
+  });
+}
+
+function renderHoursChart(rows) {
+  destroyChart('hours');
+  const types = ['Tech Screening', 'Code Review', 'Technical Pairing', 'Consulting'];
+  const hrs = types.map(t => Math.round(rows.filter(r => r.type === t).reduce((s, r) => s + r.mins, 0) / 60));
+  charts.hours = new Chart(document.getElementById('hoursChart'), {
+    type: 'doughnut',
+    data: {
+      labels: types,
+      datasets: [{ data: hrs, backgroundColor: types.map(t => TYPE_COLORS[t]), borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12, usePointStyle: true } },
+        tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw}h` } }
+      }
+    }
+  });
+}
+
+// ── TOAST ──────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
