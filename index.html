@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equal Experts — Interviewer Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{
+  --ee-cyan:#29abe2;--navy:#0f2744;--blue:#2563eb;--blue-light:#dbeafe;
+  --teal:#0d9488;--teal-light:#ccfbf1;--amber:#d97706;--amber-light:#fef3c7;
+  --purple:#7c3aed;--purple-light:#ede9fe;--green:#16a34a;--green-light:#dcfce7;
+  --green-mid:#22c55e;--orange:#ea580c;--orange-light:#ffedd5;
+  --gray-50:#f8fafc;--gray-100:#f1f5f9;--gray-200:#e2e8f0;--gray-300:#cbd5e1;
+  --gray-400:#94a3b8;--gray-600:#475569;--gray-800:#1e293b;
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --radius:10px;--radius-lg:16px;--shadow:0 1px 3px rgba(0,0,0,0.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);background:var(--gray-50);color:var(--gray-800);min-height:100vh;}
+
+/* HEADER */
+.header{background:var(--navy);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100;border-bottom:2px solid var(--ee-cyan);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-titles h1{font-size:15px;font-weight:600;color:white;letter-spacing:-0.2px;}
+.header-titles p{font-size:11px;color:rgba(255,255,255,0.45);margin-top:1px;}
+.header-right{display:flex;align-items:center;gap:8px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;font-family:var(--font);}
+.btn-primary{background:var(--ee-cyan);color:white;}.btn-primary:hover{background:#1a9fd4;}
+.btn-ghost{background:rgba(255,255,255,0.08);color:white;border:1px solid rgba(255,255,255,0.15);}.btn-ghost:hover{background:rgba(255,255,255,0.15);}
+.btn svg{width:13px;height:13px;flex-shrink:0;}
+.file-count-badge{background:var(--ee-cyan);color:white;font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:4px;}
+
+/* ROSTER BAR */
+#rosterBar{background:#071828;border-bottom:1px solid rgba(41,171,226,0.2);padding:5px 1.5rem;font-size:11px;color:rgba(255,255,255,0.55);display:flex;align-items:center;gap:8px;}
+.r-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.r-dot-ok{background:var(--green-mid);}
+.r-dot-warn{background:#fbbf24;}
+.r-dot-err{background:#f87171;}
+
+/* UPLOAD ZONE */
+#uploadZone{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 84px);padding:2rem;gap:1.25rem;}
+.upload-card{background:white;border-radius:var(--radius-lg);border:2px dashed var(--gray-200);padding:2rem;max-width:540px;width:100%;text-align:center;transition:border-color 0.2s,background 0.2s;cursor:pointer;}
+.upload-card:hover{border-color:var(--ee-cyan);}
+.upload-card.drag-over{border-color:var(--ee-cyan);background:#f0faff;}
+.upload-icon{width:44px;height:44px;border-radius:12px;background:#e8f7fd;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;}
+.upload-icon svg{width:22px;height:22px;color:var(--ee-cyan);}
+.upload-card h2{font-size:15px;font-weight:600;color:var(--gray-800);margin-bottom:6px;}
+.upload-card p{font-size:12px;color:var(--gray-600);line-height:1.6;}
+.upload-card .hint{font-size:11px;color:var(--gray-400);margin-top:0.75rem;}
+.supported{display:flex;gap:6px;justify-content:center;margin-top:0.75rem;flex-wrap:wrap;}
+.tag{padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500;background:var(--gray-100);color:var(--gray-600);border:1px solid var(--gray-200);}
+#fileInput{display:none;}
+
+.file-list-box{background:white;border-radius:var(--radius);border:1px solid var(--gray-200);max-width:540px;width:100%;padding:0.875rem 1rem;}
+.file-list-box h3{font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
+.file-item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;color:var(--gray-800);}
+.file-item:not(:last-child){border-bottom:1px solid var(--gray-100);}
+.file-item svg{width:13px;height:13px;color:var(--green);flex-shrink:0;}
+.file-remove{margin-left:auto;cursor:pointer;color:var(--gray-400);font-size:16px;line-height:1;padding:0 4px;}.file-remove:hover{color:#dc2626;}
+
+.mapping-info{max-width:540px;width:100%;background:white;border-radius:var(--radius);border:1px solid var(--gray-200);padding:0.875rem 1rem;}
+.mapping-info h3{font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
+.mapping-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;}
+.mapping-row:not(:last-child){border-bottom:1px solid var(--gray-100);}
+.mapping-kw{font-family:monospace;font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px;color:var(--gray-600);}
+.arrow{color:var(--gray-400);}
+.type-badge{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.tb-ts{background:var(--blue-light);color:#1e40af;}.tb-cr{background:var(--teal-light);color:#0f766e;}
+.tb-tp{background:var(--amber-light);color:#92400e;}.tb-ci{background:var(--purple-light);color:#5b21b6;}
+
+/* DASHBOARD */
+#dashboard{display:none;padding:1.25rem 1.5rem 2rem;max-width:1440px;margin:0 auto;}
+.dash-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1.25rem;}
+.dash-title{font-size:18px;font-weight:700;color:var(--gray-800);}
+.dash-sub{font-size:12px;color:var(--gray-400);margin-top:2px;}
+.dash-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.dash-actions select{font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--gray-200);background:white;color:var(--gray-800);font-family:var(--font);cursor:pointer;}
+
+/* METRICS */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1.25rem;}
+.metric-card{background:white;border-radius:var(--radius);border:1px solid var(--gray-200);padding:0.875rem 1rem;box-shadow:var(--shadow);}
+.m-label{font-size:10px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;}
+.m-val{font-size:26px;font-weight:700;color:var(--gray-800);letter-spacing:-1px;line-height:1;}
+.m-sub{font-size:11px;color:var(--gray-400);margin-top:3px;}
+.ac-cyan{border-top:3px solid var(--ee-cyan);}.ac-green{border-top:3px solid var(--green);}
+.ac-amber{border-top:3px solid var(--amber);}.ac-purple{border-top:3px solid var(--purple);}
+.ac-orange{border-top:3px solid var(--orange);}.ac-teal{border-top:3px solid var(--teal);}
+
+/* GRID */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;}
+.grid-3-1{display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem;}
+@media(max-width:900px){.grid-2,.grid-3-1{grid-template-columns:1fr;}}
+.card{background:white;border-radius:var(--radius-lg);border:1px solid var(--gray-200);padding:1.125rem 1.25rem;box-shadow:var(--shadow);}
+.card-title{font-size:12px;font-weight:600;color:var(--gray-800);margin-bottom:0.875rem;display:flex;align-items:center;gap:7px;}
+.card-title svg{width:14px;height:14px;color:var(--gray-400);flex-shrink:0;}
+
+/* PROGRESSION */
+.prog-table{width:100%;border-collapse:collapse;font-size:12px;}
+.prog-table th{font-size:10px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.4px;padding:5px 8px;text-align:left;border-bottom:1px solid var(--gray-200);white-space:nowrap;}
+.prog-table td{padding:7px 8px;border-bottom:1px solid var(--gray-100);vertical-align:middle;}
+.prog-table tr:last-child td{border-bottom:none;}
+.prog-table tr:hover td{background:var(--gray-50);}
+.iv-name-cell{display:flex;align-items:center;gap:7px;}
+.avatar{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;}
+.avatar-lead{background:var(--green-light);color:#15803d;}
+.avatar-shadow{background:var(--orange-light);color:#c2410c;}
+.avatar-unknown{background:var(--gray-100);color:var(--gray-600);}
+.status-lead{display:inline-flex;align-items:center;gap:4px;background:var(--green-light);color:#15803d;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;}
+.status-shadow{display:inline-flex;align-items:center;gap:4px;background:var(--orange-light);color:#c2410c;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;}
+.status-unknown{display:inline-flex;align-items:center;gap:4px;background:var(--gray-100);color:var(--gray-600);padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;}
+.status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.dot-lead{background:var(--green-mid);}.dot-shadow{background:var(--orange);}.dot-unknown{background:var(--gray-400);}
+
+/* TYPE CARDS */
+.type-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;}
+.type-card{border-radius:8px;padding:10px 12px;border:1px solid var(--gray-200);}
+.tc-label{font-size:10px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.4px;}
+.tc-val{font-size:22px;font-weight:700;margin-top:2px;letter-spacing:-1px;}
+.tc-sub{font-size:10px;color:var(--gray-400);margin-top:1px;}
+.tc-note{font-size:9px;color:var(--green);font-weight:600;margin-top:2px;}
+.type-card.ts{border-left:3px solid var(--blue);}.type-card.ts .tc-val{color:var(--blue);}
+.type-card.cr{border-left:3px solid var(--teal);}.type-card.cr .tc-val{color:var(--teal);}
+.type-card.tp{border-left:3px solid var(--amber);}.type-card.tp .tc-val{color:var(--amber);}
+.type-card.ci{border-left:3px solid var(--purple);}.type-card.ci .tc-val{color:var(--purple);}
+
+/* CHAMPION */
+.champion-wrap{display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap;}
+.champion-avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:white;}
+.champion-name{font-size:18px;font-weight:700;color:var(--gray-800);letter-spacing:-0.5px;}
+.champion-stats{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap;}
+.cstat{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:7px 12px;text-align:center;min-width:60px;}
+.cstat .cv{font-size:18px;font-weight:700;color:var(--gray-800);}
+.cstat .cl{font-size:9px;font-weight:500;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.3px;margin-top:1px;}
+.gold-badge{display:inline-flex;align-items:center;gap:4px;background:var(--amber-light);color:#92400e;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;margin-left:8px;}
+
+/* LEADERBOARD */
+.leaderboard{width:100%;border-collapse:collapse;font-size:12px;}
+.leaderboard th{font-size:10px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.4px;padding:5px 8px;text-align:left;border-bottom:1px solid var(--gray-200);white-space:nowrap;}
+.leaderboard td{padding:7px 8px;border-bottom:1px solid var(--gray-100);color:var(--gray-800);vertical-align:middle;}
+.leaderboard tr:last-child td{border-bottom:none;}
+.leaderboard tr:hover td{background:var(--gray-50);}
+.bar-wrap{background:var(--gray-100);border-radius:4px;height:5px;min-width:70px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:4px;background:var(--ee-cyan);}
+
+/* TABS + SEARCH */
+.tabs{display:flex;gap:2px;background:var(--gray-100);border-radius:8px;padding:3px;margin-bottom:1rem;width:fit-content;}
+.tab-btn{padding:5px 13px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--gray-600);font-family:var(--font);transition:all 0.15s;}
+.tab-btn.active{background:white;color:var(--gray-800);box-shadow:var(--shadow);}
+.search-bar{width:100%;padding:7px 10px 7px 32px;border-radius:8px;border:1px solid var(--gray-200);font-size:12px;font-family:var(--font);color:var(--gray-800);background:white;margin-bottom:0.75rem;}
+.search-wrap{position:relative;}
+.search-wrap svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--gray-400);pointer-events:none;}
+
+.chart-wrap{position:relative;}
+.table-scroll{overflow-x:auto;}
+.empty{text-align:center;padding:1.5rem;color:var(--gray-400);font-size:12px;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--gray-800);color:white;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:500;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:999;white-space:nowrap;}
+.toast.show{opacity:1;}
+.footer{text-align:center;padding:1.25rem;font-size:11px;color:var(--gray-400);border-top:1px solid var(--gray-200);margin-top:1rem;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="36" height="36" rx="6" fill="#0f2744"/>
+      <path d="M6 6L6 30L12 30L12 27L9 27L9 9L12 9L12 6Z" fill="#29abe2"/>
+      <path d="M30 6L30 30L24 30L24 27L27 27L27 9L24 9L24 6Z" fill="#29abe2"/>
+      <rect x="12" y="16" width="12" height="4" fill="#29abe2"/>
+      <rect x="12" y="9" width="7" height="3" fill="#29abe2"/>
+      <rect x="12" y="24" width="7" height="3" fill="#29abe2"/>
+    </svg>
+    <div class="header-titles">
+      <h1>Equal Experts — Interviewer Dashboard</h1>
+      <p id="headerSub">Loading panel roster…</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-ghost" id="resetBtn" style="display:none" onclick="resetDashboard()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Reset
+    </button>
+    <button class="btn btn-primary" id="addMoreBtn" style="display:none" onclick="document.getElementById('fileInput').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Add files <span class="file-count-badge" id="fileCountBadge" style="display:none"></span>
+    </button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple onchange="handleGHFiles(this.files)">
+  </div>
+</header>
+
+<!-- ROSTER STATUS BAR -->
+<div id="rosterBar">
+  <span class="r-dot" id="rosterDot"></span>
+  <span id="rosterBarText">Loading panels.csv…</span>
+</div>
+
+<!-- UPLOAD ZONE -->
+<div id="uploadZone">
+  <div class="upload-card" id="ghDropZone"
+    onclick="document.getElementById('fileInput').click()"
+    ondragover="event.preventDefault();this.classList.add('drag-over')"
+    ondragleave="this.classList.remove('drag-over')"
+    ondrop="this.classList.remove('drag-over');handleGHFiles(event.dataTransfer.files);event.preventDefault()">
+    <div class="upload-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+    </div>
+    <h2>Upload Greenhouse Scorecard Export</h2>
+    <p>Drop one or multiple XLS/XLSX files exported from Greenhouse Reports. The panel roster is loaded automatically from GitHub.</p>
+    <div class="supported">
+      <span class="tag">.xlsx</span><span class="tag">.xls</span><span class="tag">.csv</span>
+      <span class="tag">Multiple files supported</span>
+    </div>
+    <div style="margin-top:1rem">
+      <button class="btn btn-primary" onclick="event.stopPropagation();document.getElementById('fileInput').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Choose files
+      </button>
+    </div>
+    <p class="hint">Data never leaves your browser — everything is processed locally.</p>
+  </div>
+
+  <div class="file-list-box" id="fileListBox" style="display:none">
+    <h3>Files loaded <span id="fileListCount"></span></h3>
+    <div id="fileListItems"></div>
+    <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="document.getElementById('fileInput').click()" style="font-size:11px;padding:5px 10px;background:var(--gray-100);color:var(--gray-800);border:none">+ Add more</button>
+      <button class="btn btn-primary" onclick="buildDashboard()" style="font-size:11px;padding:5px 10px;">View Dashboard →</button>
+    </div>
+  </div>
+
+  <div class="mapping-info">
+    <h3>How interview types are detected</h3>
+    <div class="mapping-row">
+      <span class="mapping-kw">Technical Screening</span><span class="arrow">→</span>
+      <span class="type-badge tb-ts">Tech Screening</span>
+      <span style="font-size:11px;color:var(--gray-400);margin-left:auto">30 min</span>
+    </div>
+    <div class="mapping-row">
+      <span class="mapping-kw">Snapcode Review / Code Review</span><span class="arrow">→</span>
+      <span class="type-badge tb-cr">Code Review / Take Home</span>
+      <span style="font-size:11px;color:var(--gray-400);margin-left:auto">30 min · deduped per candidate</span>
+    </div>
+    <div class="mapping-row">
+      <span class="mapping-kw">Technical Skills Interview</span><span class="arrow">→</span>
+      <span class="type-badge tb-tp">Technical Pairing</span>
+      <span style="font-size:11px;color:var(--gray-400);margin-left:auto">90 min</span>
+    </div>
+    <div class="mapping-row">
+      <span class="mapping-kw">Consulting Skills Interview</span><span class="arrow">→</span>
+      <span class="type-badge tb-ci">Consulting</span>
+      <span style="font-size:11px;color:var(--gray-400);margin-left:auto">60 min</span>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="dash-header">
+    <div>
+      <div class="dash-title">Interviewer Dashboard</div>
+      <div class="dash-sub" id="dashSub">—</div>
+    </div>
+    <div class="dash-actions">
+      <select id="filterType" onchange="renderDashboard()">
+        <option value="all">All interview types</option>
+        <option value="Tech Screening">Tech Screening</option>
+        <option value="Code Review">Code Review / Take Home</option>
+        <option value="Technical Pairing">Technical Pairing</option>
+        <option value="Consulting">Consulting</option>
+      </select>
+      <select id="filterRole" onchange="renderDashboard()">
+        <option value="all">All roles</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="metrics" id="metricsRow"></div>
+
+  <div class="grid-3-1">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Panel progression tracker
+        <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <span style="display:flex;align-items:center;gap:3px;font-size:10px;color:#15803d;font-weight:600"><span style="width:7px;height:7px;background:var(--green-mid);border-radius:50%;display:inline-block"></span>Lead</span>
+          <span style="display:flex;align-items:center;gap:3px;font-size:10px;color:#c2410c;font-weight:600"><span style="width:7px;height:7px;background:var(--orange);border-radius:50%;display:inline-block"></span>Shadower</span>
+        </span>
+      </div>
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="search-bar" id="progSearch" placeholder="Search interviewer…" oninput="renderProgTable()">
+      </div>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="setTab('all')" id="tab-all">All</button>
+        <button class="tab-btn" onclick="setTab('lead')" id="tab-lead">Leads</button>
+        <button class="tab-btn" onclick="setTab('shadow')" id="tab-shadow">Shadowers</button>
+        <button class="tab-btn" onclick="setTab('unmatched')" id="tab-unmatched">Not in roster</button>
+      </div>
+      <div class="table-scroll" style="max-height:500px;overflow-y:auto">
+        <table class="prog-table">
+          <thead>
+            <tr>
+              <th>Interviewer</th><th>Status</th><th>Tech Screen</th>
+              <th>Code Rev / Take Home</th><th>Tech Pairing</th><th>Consulting</th><th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="progBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:1rem">
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+          Champion <span class="gold-badge">⭐ Most interviews</span>
+        </div>
+        <div id="champCard"><div class="empty">No data</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Scorecard breakdown</div>
+        <div class="type-cards" id="typeCards"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        Scorecards by role
+      </div>
+      <div class="chart-wrap" style="height:260px"><canvas id="roleChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Submission trend
+      </div>
+      <div class="chart-wrap" style="height:260px"><canvas id="trendChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+      Full leaderboard — ranked by scorecard volume
+    </div>
+    <div class="table-scroll">
+      <table class="leaderboard">
+        <thead>
+          <tr>
+            <th>#</th><th>Interviewer</th><th>Status</th>
+            <th>Tech Screen</th><th>Code Rev / Take Home</th><th>Tech Pairing</th><th>Consulting</th>
+            <th>Total</th><th>Hours</th><th>Volume</th>
+          </tr>
+        </thead>
+        <tbody id="leaderBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">Equal Experts · Data processed in your browser · No server · No storage</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONSTANTS ────────────────────────────────────────────────────────────
+const TYPE_MAP = [
+  {keywords:['technical screening','tech screening','technical screen'],type:'Tech Screening',mins:30},
+  {keywords:['snapcode review','snap code review','code review','take home test','take home'],type:'Code Review',mins:30},
+  {keywords:['technical skills interview','technical skills','technical interview','tech pairing','technical pairing'],type:'Technical Pairing',mins:90},
+  {keywords:['consulting skills interview','consulting skills','consulting interview','consulting'],type:'Consulting',mins:60},
+];
+
+// ── STATE ────────────────────────────────────────────────────────────────
+let roster = {};      // { "name lowercase": "Lead" | "Shadower" }
+let rosterRaw = [];   // [{ name, type }]
+let allRows = [];
+let loadedFiles = [];
+let charts = {};
+let activeTab = 'all';
+
+// ── AUTO-FETCH ROSTER FROM GITHUB ON PAGE LOAD ───────────────────────────
+// Tries to load panels.csv from the same directory as index.html
+async function autoLoadRoster() {
+  const paths = ['panels.csv', './panels.csv'];
+  for (const path of paths) {
+    try {
+      const res = await fetch(path);
+      if (res.ok) {
+        const text = await res.text();
+        const data = parseSimpleCSV(text);
+        parseRoster(data);
+        if (rosterRaw.length > 0) {
+          updateRosterBar(true);
+          return;
+        }
+      }
+    } catch(e) { /* try next */ }
+  }
+  // Not found
+  updateRosterBar(false);
+}
+
+function updateRosterBar(loaded) {
+  const dot = document.getElementById('rosterDot');
+  const text = document.getElementById('rosterBarText');
+  const sub = document.getElementById('headerSub');
+  if (loaded) {
+    const leads = rosterRaw.filter(r => r.type.toLowerCase().includes('lead')).length;
+    const shadows = rosterRaw.length - leads;
+    dot.className = 'r-dot r-dot-ok';
+    text.innerHTML = `<strong style="color:#4ade80">Panel roster loaded</strong> &nbsp;·&nbsp; ${rosterRaw.length} panelists &nbsp;·&nbsp; ${leads} Leads &nbsp;·&nbsp; ${shadows} Shadowers &nbsp;·&nbsp; panels.csv`;
+    sub.textContent = 'Panel roster ready — upload your Greenhouse export to begin';
+  } else {
+    dot.className = 'r-dot r-dot-warn';
+    text.innerHTML = `<strong style="color:#fbbf24">panels.csv not found</strong> &nbsp;·&nbsp; Upload panels.csv to your GitHub repo alongside index.html`;
+    sub.textContent = 'Roster not loaded — upload Greenhouse export (panels will show as "Not in roster")';
+  }
+  document.getElementById('rosterBar').style.display = 'flex';
+}
+
+// ── ROSTER PARSING ───────────────────────────────────────────────────────
+function parseRoster(data) {
+  roster = {}; rosterRaw = [];
+  data.forEach(row => {
+    const name = String(row['Panel name'] || row['Panel Name'] || row['name'] || row['Name'] || Object.values(row)[0] || '').trim();
+    const type = String(row['Type'] || row['Status'] || row['type'] || row['status'] || Object.values(row)[1] || '').trim();
+    if (name && type) {
+      roster[name.toLowerCase()] = type;
+      rosterRaw.push({ name, type });
+    }
+  });
+}
+
+function getRosterStatus(interviewer) {
+  return roster[(interviewer||'').toLowerCase()] || null;
+}
+
+function parseSimpleCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    const vals = line.split(',').map(v => v.replace(/"/g,'').trim());
+    const o = {}; headers.forEach((h,i) => o[h] = vals[i]||''); return o;
+  });
+}
+
+// ── GREENHOUSE FILE HANDLING ─────────────────────────────────────────────
+function handleGHFiles(files) {
+  if (!files || !files.length) return;
+  const arr = Array.from(files);
+  let pending = arr.length;
+  arr.forEach(file => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        let data;
+        if (ext === 'csv') data = parseGreenhouseCSV(e.target.result);
+        else data = parseGreenhouseXLS(new Uint8Array(e.target.result));
+        const rows = processRows(data);
+        if (rows.length > 0 && !loadedFiles.find(f => f.name === file.name))
+          loadedFiles.push({ name: file.name, rows });
+      } catch(err) { console.error(file.name, err); }
+      pending--;
+      if (pending === 0) afterGHLoaded();
+    };
+    if (ext === 'csv') reader.readAsText(file);
+    else reader.readAsArrayBuffer(file);
+  });
+}
+
+function afterGHLoaded() {
+  allRows = loadedFiles.flatMap(f => f.rows);
+  updateFileListUI();
+  if (!allRows.length) { showToast('⚠️ No scorecard data found. Check these are Greenhouse Scorecard Feedback Reports.'); return; }
+  showToast('✓ ' + allRows.length + ' scorecards loaded from ' + loadedFiles.length + ' file(s)');
+  document.getElementById('fileListBox').style.display = 'block';
+}
+
+function removeFile(name) {
+  loadedFiles = loadedFiles.filter(f => f.name !== name);
+  allRows = loadedFiles.flatMap(f => f.rows);
+  updateFileListUI();
+  if (document.getElementById('dashboard').style.display !== 'none')
+    allRows.length > 0 ? renderDashboard() : resetDashboard();
+}
+
+function updateFileListUI() {
+  const box = document.getElementById('fileListBox');
+  if (!loadedFiles.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  document.getElementById('fileListCount').textContent = '(' + loadedFiles.length + ')';
+  document.getElementById('fileListItems').innerHTML = loadedFiles.map(f => `
+    <div class="file-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      <span>${f.name}</span>
+      <span style="font-size:10px;color:var(--gray-400);margin-left:4px">(${f.rows.length})</span>
+      <span class="file-remove" onclick="removeFile('${f.name}')">×</span>
+    </div>`).join('');
+  const badge = document.getElementById('fileCountBadge');
+  badge.textContent = loadedFiles.length;
+  badge.style.display = 'inline';
+}
+
+function buildDashboard() {
+  if (!allRows.length) return;
+  populateRoleFilter();
+  document.getElementById('uploadZone').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('resetBtn').style.display = 'flex';
+  document.getElementById('addMoreBtn').style.display = 'flex';
+  const rInfo = rosterRaw.length ? ` · Roster: ${rosterRaw.length} panelists` : ' · No roster';
+  document.getElementById('headerSub').textContent = allRows.length + ' scorecards · ' + loadedFiles.length + ' file(s)' + rInfo;
+  document.getElementById('dashSub').textContent = allRows.length + ' scorecards from ' + loadedFiles.length + ' file(s)' + rInfo;
+  renderDashboard();
+}
+
+function resetDashboard() {
+  allRows = []; loadedFiles = [];
+  Object.values(charts).forEach(c => c && c.destroy()); charts = {};
+  document.getElementById('fileInput').value = '';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('uploadZone').style.display = 'flex';
+  document.getElementById('resetBtn').style.display = 'none';
+  document.getElementById('addMoreBtn').style.display = 'none';
+  document.getElementById('fileListBox').style.display = 'none';
+  document.getElementById('fileListItems').innerHTML = '';
+}
+
+// ── GREENHOUSE PARSERS ───────────────────────────────────────────────────
+function parseGreenhouseXLS(buffer) {
+  const wb = XLSX.read(buffer, {type:'array',cellDates:true,raw:false});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, {header:1,defval:''});
+  let hi = 0;
+  for (let i = 0; i < Math.min(raw.length, 10); i++)
+    if (raw[i].some(c => String(c).trim() === 'Candidate Name')) { hi = i; break; }
+  const headers = raw[hi].map(h => String(h).trim());
+  return raw.slice(hi+1).filter(r => r.some(c => c !== '')).map(row => {
+    const o = {}; headers.forEach((h,i) => o[h] = row[i] !== undefined ? row[i] : ''); return o;
+  });
+}
+
+function parseGreenhouseCSV(text) {
+  const lines = text.trim().split('\n');
+  let hi = 0;
+  for (let i = 0; i < Math.min(lines.length, 10); i++)
+    if (lines[i].includes('Candidate Name')) { hi = i; break; }
+  const headers = lines[hi].split(',').map(h => h.replace(/"/g,'').trim());
+  return lines.slice(hi+1).filter(l => l.trim()).map(line => {
+    const vals = line.split(',').map(v => v.replace(/"/g,'').trim());
+    const o = {}; headers.forEach((h,i) => o[h] = vals[i]||''); return o;
+  });
+}
+
+// ── DATA PROCESSING ──────────────────────────────────────────────────────
+function classifyType(str) {
+  const s = (str||'').toLowerCase().trim();
+  for (const m of TYPE_MAP) if (m.keywords.some(k => s.includes(k))) return {type:m.type,mins:m.mins};
+  return {type:'Other',mins:0};
+}
+
+function formatDate(val) {
+  if (!val) return '';
+  if (val instanceof Date) return val.toISOString().slice(0,7);
+  const s = String(val);
+  const m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (m2) return `${m2[3]}-${m2[1].padStart(2,'0')}`;
+  const m1 = s.match(/(\d{4})[\/\-](\d{2})/);
+  if (m1) return `${m1[1]}-${m1[2]}`;
+  return s.slice(0,7);
+}
+
+function processRows(data) {
+  return data.map(row => {
+    const interviewer = String(row['Interviewer']||row['interviewer']||'').trim();
+    const candidate   = String(row['Candidate Name']||row['candidate']||'').trim();
+    const interviewRaw= String(row['Interview']||row['interview']||row['Stage']||'').trim();
+    const stageRaw    = String(row['Stage']||row['stage']||'').trim();
+    const role        = String(row['Job']||row['job']||'').trim();
+    const dateRaw     = row['Submitted']||row['submitted']||row['Scheduled']||'';
+    const outcome     = String(row['Outcome']||row['outcome']||'').trim();
+    if (!interviewer && !candidate) return null;
+    let c = classifyType(interviewRaw);
+    if (c.type === 'Other' && stageRaw) c = classifyType(stageRaw);
+    return {
+      interviewer: interviewer||'Unknown', candidate, interviewRaw, type:c.type, mins:c.mins,
+      role: role.replace(/^IND\s*[-–]\s*/i,'').trim()||'Unknown Role',
+      date: formatDate(dateRaw), outcome
+    };
+  }).filter(r => r && (r.interviewer !== 'Unknown' || r.candidate));
+}
+
+// ── DEDUPLICATION ────────────────────────────────────────────────────────
+function getUniqueCRCount(rows) {
+  return new Set(rows.filter(r => r.type === 'Code Review').map(r => r.candidate).filter(Boolean)).size;
+}
+
+// ── FILTERS ──────────────────────────────────────────────────────────────
+function getFiltered() {
+  const type = document.getElementById('filterType').value;
+  const role = document.getElementById('filterRole').value;
+  return allRows.filter(r => (type==='all'||r.type===type) && (role==='all'||r.role===role));
+}
+
+function populateRoleFilter() {
+  const roles = [...new Set(allRows.map(r => r.role))].sort();
+  document.getElementById('filterRole').innerHTML =
+    '<option value="all">All roles</option>' + roles.map(r => `<option value="${r}">${r}</option>`).join('');
+}
+
+function setTab(tab) {
+  activeTab = tab;
+  ['all','lead','shadow','unmatched'].forEach(t =>
+    document.getElementById('tab-'+t).classList.toggle('active', t===tab));
+  renderProgTable();
+}
+
+// ── RENDER ───────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const rows = getFiltered();
+  renderMetrics(rows);
+  renderProgTable();
+  renderChampion(rows);
+  renderTypeCards(rows);
+  renderLeaderboard(rows);
+  renderRoleChart(rows);
+  renderTrendChart(rows);
+}
+
+function renderMetrics(rows) {
+  const total = rows.length;
+  const ivs   = new Set(rows.map(r => r.interviewer)).size;
+  const hrs   = Math.round(rows.reduce((s,r) => s+r.mins, 0)/60);
+  const uniqueCR = getUniqueCRCount(rows);
+  const leads   = rosterRaw.filter(r => r.type.toLowerCase().includes('lead')).length;
+  const shadows = rosterRaw.length - leads;
+  document.getElementById('metricsRow').innerHTML = `
+    <div class="metric-card ac-cyan"><div class="m-label">Total Scorecards</div><div class="m-val">${total.toLocaleString()}</div><div class="m-sub">submitted</div></div>
+    <div class="metric-card ac-green"><div class="m-label">Lead Panelists</div><div class="m-val">${leads}</div><div class="m-sub">from roster</div></div>
+    <div class="metric-card ac-orange"><div class="m-label">Shadowers</div><div class="m-val">${shadows}</div><div class="m-sub">from roster</div></div>
+    <div class="metric-card ac-teal"><div class="m-label">Unique Take Homes</div><div class="m-val">${uniqueCR}</div><div class="m-sub">deduplicated</div></div>
+    <div class="metric-card ac-amber"><div class="m-label">Total Hours</div><div class="m-val">${hrs.toLocaleString()}</div><div class="m-sub">invested</div></div>
+    <div class="metric-card ac-purple"><div class="m-label">Active Interviewers</div><div class="m-val">${ivs}</div><div class="m-sub">in data</div></div>`;
+}
+
+function renderProgTable() {
+  const rows = getFiltered();
+  const search = (document.getElementById('progSearch').value||'').toLowerCase();
+  const ghNames = [...new Set(allRows.map(r => r.interviewer))];
+  const allNames = [...new Set([...rosterRaw.map(r=>r.name), ...ghNames])].filter(n => n && n !== 'Unknown');
+
+  let data = allNames.map(name => {
+    const status = getRosterStatus(name);
+    const ivRows = rows.filter(r => r.interviewer.toLowerCase() === name.toLowerCase());
+    const ts = ivRows.filter(r => r.type==='Tech Screening').length;
+    const cr = ivRows.filter(r => r.type==='Code Review').length;
+    const tp = ivRows.filter(r => r.type==='Technical Pairing').length;
+    const ci = ivRows.filter(r => r.type==='Consulting').length;
+    return { name, status, ts, cr, tp, ci, total:ts+cr+tp+ci, inRoster:!!status, inData:ivRows.length>0 };
+  });
+
+  if (search) data = data.filter(d => d.name.toLowerCase().includes(search));
+  if (activeTab==='lead')      data = data.filter(d => d.status && d.status.toLowerCase().includes('lead'));
+  if (activeTab==='shadow')    data = data.filter(d => d.status && !d.status.toLowerCase().includes('lead'));
+  if (activeTab==='unmatched') data = data.filter(d => !d.inRoster);
+
+  data.sort((a,b) => {
+    const rank = s => s&&s.toLowerCase().includes('lead')?0:s?1:2;
+    return rank(a.status) - rank(b.status) || b.total - a.total;
+  });
+
+  const body = document.getElementById('progBody');
+  if (!data.length) { body.innerHTML = `<tr><td colspan="7" class="empty">No panelists found</td></tr>`; return; }
+
+  body.innerHTML = data.map(d => {
+    const initials = d.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    let statusHtml, avatarClass, rowBg = '';
+    if (!d.inRoster) {
+      statusHtml = `<span class="status-unknown"><span class="status-dot dot-unknown"></span>Not in roster</span>`;
+      avatarClass = 'avatar-unknown';
+    } else if (d.status.toLowerCase().includes('lead')) {
+      statusHtml = `<span class="status-lead"><span class="status-dot dot-lead"></span>Lead</span>`;
+      avatarClass = 'avatar-lead'; rowBg = 'background:rgba(22,163,74,0.03)';
+    } else {
+      statusHtml = `<span class="status-shadow"><span class="status-dot dot-shadow"></span>Shadower</span>`;
+      avatarClass = 'avatar-shadow'; rowBg = 'background:rgba(234,88,12,0.02)';
+    }
+    return `<tr style="${rowBg}">
+      <td><div class="iv-name-cell">
+        <div class="avatar ${avatarClass}">${initials}</div>
+        <span style="font-weight:600">${d.name}</span>
+        ${!d.inData?'<span style="font-size:9px;color:var(--gray-300);margin-left:3px">no data yet</span>':''}
+      </div></td>
+      <td>${statusHtml}</td>
+      <td style="color:var(--blue);font-weight:${d.ts?'600':'400'}">${d.ts||'–'}</td>
+      <td style="color:var(--teal);font-weight:${d.cr?'600':'400'}">${d.cr||'–'}</td>
+      <td style="color:var(--amber);font-weight:${d.tp?'600':'400'}">${d.tp||'–'}</td>
+      <td style="color:var(--purple);font-weight:${d.ci?'600':'400'}">${d.ci||'–'}</td>
+      <td style="font-weight:700">${d.total||'–'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderChampion(rows) {
+  const m = {};
+  rows.forEach(r => {
+    if (!m[r.interviewer]) m[r.interviewer]={total:0,hrs:0,ts:0,cr:0,tp:0,ci:0};
+    const v=m[r.interviewer]; v.total++; v.hrs+=r.mins/60;
+    if(r.type==='Tech Screening')v.ts++;
+    else if(r.type==='Code Review')v.cr++;
+    else if(r.type==='Technical Pairing')v.tp++;
+    else if(r.type==='Consulting')v.ci++;
+  });
+  const sorted = Object.entries(m).sort((a,b)=>b[1].total-a[1].total);
+  const el = document.getElementById('champCard');
+  if (!sorted.length) { el.innerHTML='<div class="empty">No data</div>'; return; }
+  const [name,s] = sorted[0];
+  const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const status = getRosterStatus(name);
+  const statusHtml = !status
+    ? `<span class="status-unknown"><span class="status-dot dot-unknown"></span>Not in roster</span>`
+    : status.toLowerCase().includes('lead')
+    ? `<span class="status-lead"><span class="status-dot dot-lead"></span>Lead</span>`
+    : `<span class="status-shadow"><span class="status-dot dot-shadow"></span>Shadower</span>`;
+  el.innerHTML = `
+    <div class="champion-wrap">
+      <div class="champion-avatar">${initials}</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <div class="champion-name">${name}</div>${statusHtml}
+        </div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:2px">${s.total} scorecards · ${Math.round(s.hrs)}h</div>
+        <div class="champion-stats">
+          <div class="cstat"><div class="cv" style="color:var(--blue)">${s.ts}</div><div class="cl">Tech Screen</div></div>
+          <div class="cstat"><div class="cv" style="color:var(--teal)">${s.cr}</div><div class="cl">Code Rev</div></div>
+          <div class="cstat"><div class="cv" style="color:var(--amber)">${s.tp}</div><div class="cl">Tech Pair</div></div>
+          <div class="cstat"><div class="cv" style="color:var(--purple)">${s.ci}</div><div class="cl">Consulting</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderTypeCards(rows) {
+  const c={ts:0,cr:0,tp:0,ci:0}, h={ts:0,cr:0,tp:0,ci:0};
+  rows.forEach(r=>{
+    if(r.type==='Tech Screening'){c.ts++;h.ts+=r.mins/60;}
+    else if(r.type==='Code Review'){c.cr++;h.cr+=r.mins/60;}
+    else if(r.type==='Technical Pairing'){c.tp++;h.tp+=r.mins/60;}
+    else if(r.type==='Consulting'){c.ci++;h.ci+=r.mins/60;}
+  });
+  const uniqueCR = getUniqueCRCount(rows);
+  document.getElementById('typeCards').innerHTML = `
+    <div class="type-card ts"><div class="tc-label">Tech Screening</div><div class="tc-val">${c.ts}</div><div class="tc-sub">${Math.round(h.ts)}h · 30 min</div></div>
+    <div class="type-card cr"><div class="tc-label">Code Rev / Take Home</div><div class="tc-val">${c.cr}</div><div class="tc-sub">${Math.round(h.cr)}h · 30 min</div><div class="tc-note">✓ ${uniqueCR} unique candidates</div></div>
+    <div class="type-card tp"><div class="tc-label">Tech Pairing</div><div class="tc-val">${c.tp}</div><div class="tc-sub">${Math.round(h.tp)}h · 90 min</div></div>
+    <div class="type-card ci"><div class="tc-label">Consulting</div><div class="tc-val">${c.ci}</div><div class="tc-sub">${Math.round(h.ci)}h · 60 min</div></div>`;
+}
+
+function renderLeaderboard(rows) {
+  const m = {};
+  rows.forEach(r=>{
+    if(!m[r.interviewer])m[r.interviewer]={total:0,hrs:0,ts:0,cr:0,tp:0,ci:0};
+    const v=m[r.interviewer]; v.total++; v.hrs+=r.mins/60;
+    if(r.type==='Tech Screening')v.ts++;
+    else if(r.type==='Code Review')v.cr++;
+    else if(r.type==='Technical Pairing')v.tp++;
+    else if(r.type==='Consulting')v.ci++;
+  });
+  const sorted = Object.entries(m).sort((a,b)=>b[1].total-a[1].total);
+  const max = sorted[0]?.[1].total||1;
+  const body = document.getElementById('leaderBody');
+  if (!sorted.length) { body.innerHTML=`<tr><td colspan="10" class="empty">No data</td></tr>`; return; }
+  body.innerHTML = sorted.map(([name,s],i)=>{
+    const pct = Math.round((s.total/max)*100);
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+    const status = getRosterStatus(name);
+    const statusHtml = !status
+      ? `<span class="status-unknown"><span class="status-dot dot-unknown"></span>Not in roster</span>`
+      : status.toLowerCase().includes('lead')
+      ? `<span class="status-lead"><span class="status-dot dot-lead"></span>Lead</span>`
+      : `<span class="status-shadow"><span class="status-dot dot-shadow"></span>Shadower</span>`;
+    const rowBg = status ? (status.toLowerCase().includes('lead') ? 'background:rgba(22,163,74,0.03)' : '') : '';
+    return `<tr style="${rowBg}">
+      <td style="font-weight:700;color:var(--gray-400)">${medal}</td>
+      <td style="font-weight:600">${name}</td>
+      <td>${statusHtml}</td>
+      <td>${s.ts||'–'}</td><td>${s.cr||'–'}</td><td>${s.tp||'–'}</td><td>${s.ci||'–'}</td>
+      <td style="font-weight:700;font-size:14px">${s.total}</td>
+      <td style="color:var(--gray-400);font-size:11px">${Math.round(s.hrs)}h</td>
+      <td style="min-width:90px"><div style="display:flex;align-items:center;gap:5px">
+        <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <span style="font-size:10px;color:var(--gray-400)">${pct}%</span>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function destroyChart(k){if(charts[k]){charts[k].destroy();charts[k]=null;}}
+
+function renderRoleChart(rows) {
+  destroyChart('role');
+  const rc={};
+  rows.forEach(r=>rc[r.role]=(rc[r.role]||0)+1);
+  const sorted=Object.entries(rc).sort((a,b)=>b[1]-a[1]).slice(0,14);
+  document.querySelector('#roleChart').parentElement.style.height=Math.max(240,sorted.length*30+60)+'px';
+  charts.role=new Chart(document.getElementById('roleChart'),{
+    type:'bar',
+    data:{labels:sorted.map(([r])=>r),datasets:[{data:sorted.map(([,c])=>c),backgroundColor:'#29abe2',borderRadius:4,borderSkipped:false}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}},y:{ticks:{font:{size:10}},grid:{display:false}}}}
+  });
+}
+
+function renderTrendChart(rows) {
+  destroyChart('trend');
+  const bm={};
+  rows.forEach(r=>{if(r.date)bm[r.date]=(bm[r.date]||0)+1;});
+  const months=Object.keys(bm).sort();
+  charts.trend=new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{labels:months,datasets:[{data:months.map(m=>bm[m]),borderColor:'#29abe2',backgroundColor:'rgba(41,171,226,0.07)',tension:0.35,fill:true,pointRadius:4,pointBackgroundColor:'#29abe2'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10},maxRotation:30},grid:{display:false}},y:{ticks:{font:{size:10},stepSize:1},grid:{color:'rgba(0,0,0,0.05)'}}}}
+  });
+}
+
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);}
+
+// ── INIT ─────────────────────────────────────────────────────────────────
+autoLoadRoster();
+</script>
+</body>
+</html>
